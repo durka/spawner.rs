@@ -8,6 +8,10 @@ matrix:
       env:
        - FEATURES=
        - BENCH=
+    - rust: nightly
+      env:
+       - FEATURES=nightly
+       - BENCH=
 branches:
   only:
     - master
