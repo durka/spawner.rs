@@ -9,7 +9,7 @@ use std::thread;
 #[cfg(not(feature = "nightly"))] use std::mem;
 
 /// A wrapper for `thread::spawn` that optionally auto-joins threads.
-struct Spawner {
+pub struct Spawner {
     threads: Vec<thread::JoinHandle<()>>
 }
 
