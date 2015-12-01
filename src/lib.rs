@@ -55,12 +55,49 @@ impl Drop for Spawner {
     }
 }
 
+#[cfg(test)]
 #[test]
 fn spawn_some_threads() {
-    let mut spawner = Spawner::new();
-    spawner.spawn(move || println!("0")).join().unwrap();
-    for i in 1..10 {
-        spawner.spawn_collected(move || println!("{}", i));
+    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    static ACTIVE: AtomicUsize = ATOMIC_USIZE_INIT;
+
+    {
+        let mut spawner = Spawner::new();
+
+        assert!(
+            spawner.spawn(move || {
+                            ACTIVE.fetch_add(1, Ordering::SeqCst);
+                            sleep(Duration::from_millis(100));
+                            ACTIVE.fetch_sub(1, Ordering::SeqCst);
+                         })
+                   .join()
+                   .is_ok()
+        );
+
+        assert_eq!(
+            ACTIVE.load(Ordering::SeqCst),
+            0
+        );
+
+        for _ in 1..10 {
+            spawner.spawn_collected(move || {
+                                      ACTIVE.fetch_add(1, Ordering::SeqCst);
+                                      sleep(Duration::from_millis(100));
+                                      ACTIVE.fetch_sub(1, Ordering::SeqCst);
+                                   });
+        }
+
+        assert!(
+            ACTIVE.load(Ordering::SeqCst) > 0
+        );
     }
+
+    assert_eq!(
+        ACTIVE.load(Ordering::SeqCst),
+        0
+    );
 }
 
