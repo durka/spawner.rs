@@ -15,7 +15,7 @@ pub struct Spawner {
 
 impl Spawner {
     /// Create a new Spawner object
-    pub fn new() -> Spawner { Spawner { threads: Vec::new() } }
+    pub fn new() -> Spawner { Spawner { threads: vec![] } }
 
     /// Spawn a thread that will be auto-joined when the Spawner is dropped
     ///
@@ -26,7 +26,7 @@ impl Spawner {
         self.threads.push(thread::spawn(f));
     }
     
-    /// Spawn a thread that won't be auto-joine
+    /// Spawn a thread that won't be auto-joined
     ///
     /// The thread function should be a move closure
     pub fn spawn<F, T>(&mut self, f: F) -> thread::JoinHandle<T>
@@ -47,7 +47,7 @@ impl Drop for Spawner {
 
     #[cfg(not(feature = "nightly"))]
     fn drop(&mut self) {
-        mem::replace(&mut self.threads, Vec::new())
+        mem::replace(&mut self.threads, vec![])
             .into_iter()
             .map(thread::JoinHandle::join)
             .collect::<Result<Vec<_>,_>>()
