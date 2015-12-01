@@ -39,65 +39,84 @@ impl Spawner {
 impl Drop for Spawner {
     #[cfg(feature = "nightly")]
     fn drop(&mut self) {
-        self.threads.drain(..)
-            .map(thread::JoinHandle::join)
-            .collect::<Result<Vec<_>,_>>()
-            .unwrap();
+        assert!(self.threads.drain(..)
+                    .map(thread::JoinHandle::join)
+                    .find(Result::is_err)
+                    .is_none());
     }
 
     #[cfg(not(feature = "nightly"))]
     fn drop(&mut self) {
-        mem::replace(&mut self.threads, vec![])
-            .into_iter()
-            .map(thread::JoinHandle::join)
-            .collect::<Result<Vec<_>,_>>()
-            .unwrap();
+        assert!(mem::replace(&mut self.threads, vec![])
+                    .into_iter()
+                    .map(thread::JoinHandle::join)
+                    .find(Result::is_err)
+                    .is_none());
     }
 }
 
-#[cfg(test)]
-#[test]
-fn spawn_some_threads() {
-    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-    use std::thread::sleep;
-    use std::time::Duration;
+#[cfg(test)] mod tests {
+    use super::Spawner;
 
-    static ACTIVE: AtomicUsize = ATOMIC_USIZE_INIT;
+    #[test]
+    fn spawn_some_threads() {
+        use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+        use std::thread::sleep;
+        use std::time::Duration;
 
-    {
-        let mut spawner = Spawner::new();
+        static ACTIVE: AtomicUsize = ATOMIC_USIZE_INIT;
 
-        assert!(
-            spawner.spawn(move || {
-                            ACTIVE.fetch_add(1, Ordering::SeqCst);
-                            sleep(Duration::from_millis(100));
-                            ACTIVE.fetch_sub(1, Ordering::SeqCst);
-                         })
-                   .join()
-                   .is_ok()
-        );
+        {
+            let mut spawner = Spawner::new();
 
+            // an manually joined thread
+            assert!(
+                spawner.spawn(move || {
+                                ACTIVE.fetch_add(1, Ordering::SeqCst);
+                                sleep(Duration::from_millis(100));
+                                ACTIVE.fetch_sub(1, Ordering::SeqCst);
+                             })
+                       .join()
+                       .is_ok()
+            );
+
+            // make sure the manual thread finished
+            assert_eq!(
+                ACTIVE.load(Ordering::SeqCst),
+                0
+            );
+
+            // some collected threads
+            for _ in 1..10 {
+                spawner.spawn_collected(move || {
+                                          ACTIVE.fetch_add(1, Ordering::SeqCst);
+                                          sleep(Duration::from_millis(100));
+                                          ACTIVE.fetch_sub(1, Ordering::SeqCst);
+                                       });
+            }
+
+            // make sure at least some have started
+            assert!(
+                ACTIVE.load(Ordering::SeqCst) > 0
+            );
+
+            // collected threads implicitly joined here
+        }
+
+        // make sure they all finished
         assert_eq!(
             ACTIVE.load(Ordering::SeqCst),
             0
         );
-
-        for _ in 1..10 {
-            spawner.spawn_collected(move || {
-                                      ACTIVE.fetch_add(1, Ordering::SeqCst);
-                                      sleep(Duration::from_millis(100));
-                                      ACTIVE.fetch_sub(1, Ordering::SeqCst);
-                                   });
-        }
-
-        assert!(
-            ACTIVE.load(Ordering::SeqCst) > 0
-        );
     }
 
-    assert_eq!(
-        ACTIVE.load(Ordering::SeqCst),
-        0
-    );
+    #[test]
+    #[should_panic]
+    fn failing_thread() {
+        {
+            let mut spawner = Spawner::new();
+            spawner.spawn_collected(move || panic!());
+        }
+    }
 }
 
