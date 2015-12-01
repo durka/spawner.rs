@@ -95,11 +95,6 @@ impl Drop for Spawner {
                                        });
             }
 
-            // make sure at least some have started
-            assert!(
-                ACTIVE.load(Ordering::SeqCst) > 0
-            );
-
             // collected threads implicitly joined here
         }
 
