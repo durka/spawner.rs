@@ -1,8 +1,9 @@
 [package]
 name = "spawner"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Alex Burka <aburka@seas.upenn.edu>"]
 description = "Tiny wrapper for `thread::spawn` which optionally auto-joins threads on drop"
+categories = ["os", "asynchronous"]
 homepage = "https://github.com/durka/spawner.rs"
 repository = "https://github.com/durka/spawner.rs"
 readme = "README.md"
